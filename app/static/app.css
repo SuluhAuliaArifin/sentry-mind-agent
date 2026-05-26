@@ -1,0 +1,37 @@
+:root { --bg:#0f1115; --panel:#171a21; --text:#e6e6e6; --muted:#8a93a6;
+        --accent:#4ade80; --border:#262a33;
+        --low:#3b82f6; --med:#f59e0b; --high:#ef4444; --crit:#7c3aed; }
+* { box-sizing:border-box; }
+body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       background:var(--bg); color:var(--text); }
+.topbar { display:flex; justify-content:space-between; align-items:center;
+          padding:12px 24px; background:#0a0c10; border-bottom:1px solid var(--border); }
+.topbar h1 { margin:0; font-size:18px; }
+.topbar nav a { color:var(--muted); margin-left:12px; text-decoration:none; }
+.container { max-width:1200px; margin:24px auto; padding:0 24px; }
+.panel { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+         padding:20px; margin-bottom:20px; }
+.panel-head { display:flex; justify-content:space-between; align-items:baseline;
+              margin-bottom:12px; }
+.meta { color:var(--muted); font-size:12px; }
+.add-form { display:flex; gap:8px; margin:12px 0 20px; }
+.add-form input { flex:1; padding:8px 10px; background:#0d1016; color:var(--text);
+                  border:1px solid var(--border); border-radius:6px; }
+.add-form input:first-child { flex:2; }
+button { padding:8px 14px; background:var(--accent); color:#0a0c10; border:0;
+         border-radius:6px; font-weight:600; cursor:pointer; }
+button:hover { filter:brightness(1.1); }
+table.data { width:100%; border-collapse:collapse; }
+table.data th, table.data td { padding:10px 8px; border-bottom:1px solid var(--border);
+                                text-align:left; vertical-align:top; }
+table.data th { color:var(--muted); font-weight:500; font-size:12px;
+                text-transform:uppercase; letter-spacing:0.5px; }
+table.data a { color:#93c5fd; }
+.empty { text-align:center; color:var(--muted); padding:24px; }
+.sev { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px;
+       font-weight:700; color:#fff; }
+.sev-LOW { background:var(--low); } .sev-MEDIUM { background:var(--med); }
+.sev-HIGH { background:var(--high); } .sev-CRITICAL { background:var(--crit); }
+pre { background:#0a0c10; padding:12px; border-radius:6px; overflow:auto;
+      border:1px solid var(--border); }
+footer { text-align:center; color:var(--muted); padding:24px; }
