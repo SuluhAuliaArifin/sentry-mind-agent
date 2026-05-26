@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <a href="/">← back</a>
+  <h2>Scan #{{ scan.id }} — {{ scan.target.url }}</h2>
+  <p>
+    <span class="sev sev-{{ scan.severity }}">{{ scan.severity }}</span>
+    · status: {{ scan.status }}
+    · {{ scan.created_at.strftime("%Y-%m-%d %H:%M UTC") }}
+  </p>
+  <p><strong>Summary:</strong> {{ scan.summary }}</p>
+
+  {% if scan.analysis %}
+  <h3>AI Analysis <small>({{ scan.analysis.model }})</small></h3>
+  <p><strong>Reasoning:</strong><br>{{ scan.analysis.reasoning }}</p>
+  <p><strong>Risk:</strong><br>{{ scan.analysis.risk }}</p>
+  <p><strong>Mitigation:</strong></p>
+  <pre>{{ scan.analysis.mitigation }}</pre>
+  {% endif %}
+
+  <h3>Findings ({{ scan.findings|length }})</h3>
+  <ul>
+  {% for f in scan.findings %}
+    <li><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
+        <strong>{{ f.check }}</strong> — {{ f.title }}
+        {% if f.detail %}<br><small>{{ f.detail }}</small>{% endif %}
+    </li>
+  {% else %}
+    <li>None — clean scan.</li>
+  {% endfor %}
+  </ul>
+
+  <h3>Actions taken</h3>
+  <ul>
+  {% for a in scan.actions %}
+    <li><strong>{{ a.kind }}</strong> — {{ a.status }} · {{ a.detail }}</li>
+  {% else %}
+    <li>No autonomous actions triggered.</li>
+  {% endfor %}
+  </ul>
+
+  <p><a href="/scans/{{ scan.id }}/report">📄 View raw markdown report</a></p>
+</section>
+{% endblock %}

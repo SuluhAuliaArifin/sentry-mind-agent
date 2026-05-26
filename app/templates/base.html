@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI Security Agent{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>🛡️ Autonomous AI Security Agent</h1>
+    <nav><a href="/">Dashboard</a> · <a href="/api/health">Health</a></nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer><small>MVP · FastAPI · Gemini · APScheduler</small></footer>
+</body>
+</html>

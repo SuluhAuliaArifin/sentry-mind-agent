@@ -1,1 +1,9 @@
 node_modules/
+
+# AI Security Agent
+__pycache__/
+.venv/
+.env
+data/
+*.db
+.pytest_cache/

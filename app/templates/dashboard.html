@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Monitored Targets</h2>
+    <span class="meta">Scan interval: every {{ interval }} min · AI: {{ "ON" if ai_enabled else "rules-only" }}</span>
+  </div>
+
+  <form hx-post="/targets" hx-target="#targets-table" hx-swap="outerHTML" class="add-form">
+    <input name="url" placeholder="https://example.com" required>
+    <input name="label" placeholder="label (optional)">
+    <button type="submit">Add target</button>
+  </form>
+
+  {% include "_targets_table.html" %}
+</section>
+{% endblock %}

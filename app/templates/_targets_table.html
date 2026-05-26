@@ -1,0 +1,33 @@
+<table id="targets-table" class="data">
+  <thead>
+    <tr>
+      <th>URL</th><th>Label</th><th>Status</th><th>Last severity</th>
+      <th>Last summary</th><th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    {% set t = row.t %}{% set last = row.last %}
+    <tr>
+      <td><a href="{{ t.url }}" target="_blank" rel="noopener">{{ t.url }}</a></td>
+      <td>{{ t.label or "—" }}</td>
+      <td>{{ "enabled" if t.enabled else "paused" }}</td>
+      <td>
+        {% if last %}
+          <span class="sev sev-{{ last.severity }}">{{ last.severity }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if last %}
+          <a href="/scans/{{ last.id }}">{{ last.summary or "(no summary)" }}</a>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        <button hx-post="/targets/{{ t.id }}/scan" hx-swap="none">Scan now</button>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="empty">No targets yet. Add one above.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
