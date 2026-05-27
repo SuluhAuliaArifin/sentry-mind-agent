@@ -20,6 +20,7 @@ from app.agents.brain import AgentBrain
 from app.actions.reports import build_report
 from app.scheduler.jobs import start_scheduler, shutdown_scheduler
 from app.orchestrator.agent_runner import run_agent
+from app.orchestrator.agent_runner import run_agent
 
 
 logging.basicConfig(
@@ -35,7 +36,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 def run(payload: dict):
     task = payload.get("task", "")
     return run_agent(task)
-    
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
