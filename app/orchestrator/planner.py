@@ -13,22 +13,34 @@ def plan_task(task: str):
         "requires_ace": True,
         "requires_rpc": False,
         "requires_sentinel": False,
-        "strategy": []
+        "strategy": [],
+        "onchain": False
     }
 
-    # routing logic sederhana
+    # =========================
+    # ✅ RPC ROUTING
+    # =========================
     if "balance" in task_lower or "wallet" in task_lower:
         plan["requires_rpc"] = True
         plan["strategy"].append("rpc_balance_check")
 
+    # =========================
+    # ✅ ACE ROUTING
+    # =========================
     if "risk" in task_lower or "analyze" in task_lower:
         plan["strategy"].append("ace_analysis")
 
+    # default ace jika kosong
+    if not plan["strategy"]:
+        plan["strategy"].append("ace_analysis")
+
+    # =========================
+    # ✅ EXECUTION / SENTINEL
+    # =========================
     if "execute" in task_lower:
         plan["requires_sentinel"] = True
         plan["strategy"].append("sentinel_execution")
-
-    if not plan["strategy"]:
-        plan["strategy"].append("ace_analysis")
+        plan["strategy"].append("chain_execution")
+        plan["onchain"] = True
 
     return plan

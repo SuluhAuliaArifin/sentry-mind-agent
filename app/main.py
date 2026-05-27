@@ -20,7 +20,7 @@ from app.agents.brain import AgentBrain
 from app.actions.reports import build_report
 from app.scheduler.jobs import start_scheduler, shutdown_scheduler
 from app.orchestrator.agent_runner import run_agent
-from app.orchestrator.agent_runner import run_agent
+from app.orchestrator.production_runner import run_production_agent
 
 
 logging.basicConfig(
@@ -32,10 +32,6 @@ logger = logging.getLogger("agent")
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-@app.post("/agent/run")
-def run(payload: dict):
-    task = payload.get("task", "")
-    return run_agent(task)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,6 +52,22 @@ app.mount(
     StaticFiles(directory=str(BASE_DIR / "static")),
     name="static"
 )
+
+
+# =========================
+# AGENT EXECUTION ROUTES
+# =========================
+
+@app.post("/agent/run")
+def run_agent_route(payload: dict):
+    task = payload.get("task", "")
+    return run_agent(task)
+
+
+@app.post("/agent/run-production")
+def run_production_route(payload: dict):
+    task = payload.get("task", "")
+    return run_production_agent(task)
 
 
 # =========================
@@ -261,10 +273,6 @@ def api_scan(scan_id: int, db: Session = Depends(get_db)):
 
 @app.post("/agent/decide/{target_id}")
 async def agent_decide(target_id: int, db: Session = Depends(get_db)):
-    """
-    Step 1: Agent decision engine (IMPORTANT FOR BOUNTY)
-    """
-
     try:
         target = db.get(Target, target_id)
         if not target:
@@ -272,7 +280,6 @@ async def agent_decide(target_id: int, db: Session = Depends(get_db)):
 
         brain = AgentBrain()
 
-        # MOCK tools dulu (nanti diganti SAP)
         tools = [
             "sap_web_scanner",
             "sap_vuln_analyzer",
