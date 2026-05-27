@@ -13,4 +13,4 @@ COPY . .
 
 RUN mkdir -p /app/data
 
-CMD ["python", "-c", "import os; import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=int(os.getenv('PORT', 8000)))"]
+CMD ["python", "run.py"]
