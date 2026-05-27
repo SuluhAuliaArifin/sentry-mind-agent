@@ -16,6 +16,7 @@ from app.database.db import init_db, get_db
 from app.database.models import Target, Scan
 from app.tools._safety import normalize_url, UnsafeTargetError
 from app.agents.core import run_scan_for_target
+from app.agents.brain import AgentBrain
 from app.actions.reports import build_report
 from app.scheduler.jobs import start_scheduler, shutdown_scheduler
 
@@ -251,40 +252,46 @@ def api_scan(scan_id: int, db: Session = Depends(get_db)):
 # AUTONOMOUS AGENT DEMO
 # =========================
 
-@app.post("/simulate-event")
-async def simulate_event(payload: dict, db: Session = Depends(get_db)):
+@app.post("/agent/decide/{target_id}")
+async def agent_decide(target_id: int, db: Session = Depends(get_db)):
+    """
+    Step 1: Agent decision engine (IMPORTANT FOR BOUNTY)
+    """
+
     try:
-        logger.info(f"simulate-event received: {payload}")
-
-        target_id = payload.get("target_id")
-        if not target_id:
-            raise HTTPException(status_code=400, detail="target_id required")
-
         target = db.get(Target, target_id)
         if not target:
-            raise HTTPException(status_code=404, detail="Target not found")
+            raise HTTPException(404, "Target not found")
 
-        logger.info(f"[AGENT] target resolved: {target_id}")
-        logger.info(f"[AGENT] execution started")
+        brain = AgentBrain()
 
-        result = await run_scan_for_target(target_id)
+        # MOCK tools dulu (nanti diganti SAP)
+        tools = [
+            "sap_web_scanner",
+            "sap_vuln_analyzer",
+            "ace_ai_inspector"
+        ]
+
+        decision = brain.decide(
+            target={
+                "id": target.id,
+                "url": target.url
+            },
+            tools=tools
+        )
+
+        logger.info(f"[BRAIN] decision: {decision}")
 
         return {
-            "status": "success",
-            "mode": "autonomous-agent",
-            "input_event": payload,
-            "target": {
-                "id": target.id,
-                "url": target.url,
-                "label": target.label
-            },
-            "agent_result": result
+            "status": "ok",
+            "mode": "agent-decision",
+            "decision": decision
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"simulate-event failed: {str(e)}")
+        logger.error(f"agent_decide failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
