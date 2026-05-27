@@ -1,21 +1,23 @@
-import asyncio
-from app.tasks.scan_tasks import run_scan_cycle
+from app.services.ai_engine import analyze_scan_results
+from app.database.db import SessionLocal
+from app.database.models import Scan
 
-class AutonomousAgent:
-    def __init__(self):
-        self.running = True
+def observe(target_id):
+    db = SessionLocal()
+    scans = db.query(Scan).filter(Scan.target_id == target_id).all()
+    db.close()
+    return scans
 
-    async def start(self):
-        print("[AGENT] Autonomous loop started")
 
-        while self.running:
-            try:
-                await run_scan_cycle()
-            except Exception as e:
-                print(f"[AGENT ERROR] {e}")
+def reason(state):
+    return analyze_scan_results(state)
 
-            # interval scan otomatis
-            await asyncio.sleep(60)  # 1 menit
 
-    def stop(self):
-        self.running = False
+def decide(analysis):
+    return analysis["risk"] == "HIGH"
+
+
+async def agent_cycle(target_id):
+    state = observe(target_id)
+    analysis = reason(state)
+    return decide(analysis)

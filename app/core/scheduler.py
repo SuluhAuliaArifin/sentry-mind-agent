@@ -1,9 +1,18 @@
 import asyncio
-from app.agent.loop import AutonomousAgent
+from app.database.db import SessionLocal
+from app.database.models import Target
+from app.agents.loop import agent_cycle, run_scan_for_target
 
-agent = AutonomousAgent()
+async def autonomous_loop():
+    while True:
+        db = SessionLocal()
+        targets = db.query(Target).filter(Target.enabled == True).all()
+        db.close()
 
-async def start_scheduler():
-    print("[SCHEDULER] Starting autonomous agent...")
+        for target in targets:
+            decision = await agent_cycle(target.id)
 
-    asyncio.create_task(agent.start())
+            if decision:
+                asyncio.create_task(run_scan_for_target(target.id))
+
+        await asyncio.sleep(60)
