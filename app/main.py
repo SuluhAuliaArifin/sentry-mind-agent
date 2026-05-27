@@ -1,5 +1,4 @@
-"""FastAPI app: dashboard + API + autonomous agent lifecycle."""
-
+"""FastAPI app: dashboard (Jinja+HTMX) + JSON API + lifecycle hooks."""
 from __future__ import annotations
 import logging
 import asyncio
@@ -19,46 +18,295 @@ from app.tools._safety import normalize_url, UnsafeTargetError
 from app.agents.core import run_scan_for_target
 from app.actions.reports import build_report
 from app.scheduler.jobs import start_scheduler, shutdown_scheduler
-from app.agents.autonomous import engine
 
-# =========================
-# LOGGING
-# =========================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s | %(message)s"
 )
 logger = logging.getLogger("agent")
 
-# =========================
-# PATH & TEMPLATE
-# =========================
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-# =========================
-# LIFESPAN (CORE FIX)
-# =========================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     start_scheduler()
-
-    # 🚀 AUTONOMOUS ENGINE START (ONLY ONCE)
-    asyncio.create_task(engine.run())
-
     logger.info("agent online — env=%s", settings.app_env)
-
     yield
-
     shutdown_scheduler()
 
-# =========================
-# FASTAPI APP INIT
-# =========================
+
 app = FastAPI(
     title="Autonomous AI Security Monitoring Agent",
     lifespan=lifespan
 )
 
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.mount(
+    "/static",
+    StaticFiles(directory=str(BASE_DIR / "static")),
+    name="static"
+)
+
+
+# =========================
+# PAGES (JINJA)
+# =========================
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard(request: Request, db: Session = Depends(get_db)):
+    targets = db.query(Target).order_by(Target.id.desc()).all()
+
+    rows = []
+    for t in targets:
+        last = (
+            db.query(Scan)
+            .filter(Scan.target_id == t.id)
+            .order_by(Scan.id.desc())
+            .first()
+        )
+        rows.append({"t": t, "last": last})
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "rows": rows,
+        "interval": settings.scan_interval_minutes,
+        "ai_enabled": bool(settings.gemini_api_key),
+    })
+
+
+@app.get("/scans/{scan_id}", response_class=HTMLResponse)
+def scan_detail(scan_id: int, request: Request, db: Session = Depends(get_db)):
+    scan = db.get(Scan, scan_id)
+    if not scan:
+        raise HTTPException(404)
+
+    return templates.TemplateResponse(
+        "scan_detail.html",
+        {"request": request, "scan": scan}
+    )
+
+
+@app.get("/scans/{scan_id}/report", response_class=PlainTextResponse)
+def scan_report(scan_id: int, db: Session = Depends(get_db)):
+    scan = db.get(Scan, scan_id)
+    if not scan:
+        raise HTTPException(404)
+
+    return build_report(scan)
+
+
+# =========================
+# ACTIONS
+# =========================
+
+@app.post("/targets", response_class=HTMLResponse)
+def add_target(
+    request: Request,
+    url: str = Form(...),
+    label: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    try:
+        normalized = normalize_url(url)
+    except UnsafeTargetError as e:
+        raise HTTPException(400, str(e))
+
+    existing = db.query(Target).filter(Target.url == normalized).first()
+
+    if existing:
+        target = existing
+    else:
+        target = Target(url=normalized, label=label[:128])
+        db.add(target)
+        db.commit()
+        db.refresh(target)
+
+    targets = db.query(Target).order_by(Target.id.desc()).all()
+
+    rows = []
+    for t in targets:
+        last = (
+            db.query(Scan)
+            .filter(Scan.target_id == t.id)
+            .order_by(Scan.id.desc())
+            .first()
+        )
+        rows.append({"t": t, "last": last})
+
+    return templates.TemplateResponse(
+        "_targets_table.html",
+        {"request": request, "rows": rows}
+    )
+
+
+@app.post("/targets/{target_id}/scan")
+async def trigger_scan(
+    target_id: int,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    target = db.get(Target, target_id)
+    if not target:
+        raise HTTPException(404)
+
+    asyncio.create_task(run_scan_for_target(target_id))
+
+    return JSONResponse({"ok": True, "queued": target_id})
+
+
+@app.post("/targets/{target_id}/toggle")
+def toggle_target(target_id: int, db: Session = Depends(get_db)):
+    target = db.get(Target, target_id)
+    if not target:
+        raise HTTPException(404)
+
+    target.enabled = not target.enabled
+    db.commit()
+
+    return {"ok": True, "enabled": target.enabled}
+
+
+@app.delete("/targets/{target_id}")
+def delete_target(target_id: int, db: Session = Depends(get_db)):
+    target = db.get(Target, target_id)
+    if not target:
+        raise HTTPException(404)
+
+    db.delete(target)
+    db.commit()
+
+    return {"ok": True}
+
+
+# =========================
+# JSON API
+# =========================
+
+@app.get("/api/health")
+def health():
+    return {"ok": True, "env": settings.app_env}
+
+
+@app.get("/api/targets")
+def api_targets(db: Session = Depends(get_db)):
+    targets = db.query(Target).all()
+
+    return [
+        {
+            "id": t.id,
+            "url": t.url,
+            "label": t.label,
+            "enabled": t.enabled
+        }
+        for t in targets
+    ]
+
+
+@app.get("/api/scans/{scan_id}")
+def api_scan(scan_id: int, db: Session = Depends(get_db)):
+    s = db.get(Scan, scan_id)
+    if not s:
+        raise HTTPException(404)
+
+    return {
+        "id": s.id,
+        "target": s.target.url,
+        "status": s.status,
+        "severity": s.severity,
+        "summary": s.summary,
+        "created_at": s.created_at.isoformat(),
+        "raw": s.raw,
+        "findings": [
+            {
+                "check": f.check,
+                "severity": f.severity,
+                "title": f.title,
+                "detail": f.detail
+            }
+            for f in s.findings
+        ],
+        "analysis": (
+            {
+                "reasoning": s.analysis.reasoning,
+                "risk": s.analysis.risk,
+                "mitigation": s.analysis.mitigation,
+                "model": s.analysis.model
+            }
+            if s.analysis else None
+        ),
+        "actions": [
+            {
+                "kind": a.kind,
+                "status": a.status,
+                "detail": a.detail
+            }
+            for a in s.actions
+        ],
+    }
+
+
+# =========================
+# AUTONOMOUS AGENT DEMO
+# =========================
+
+@app.post("/simulate-event")
+async def simulate_event(payload: dict, db: Session = Depends(get_db)):
+    try:
+        logger.info(f"simulate-event received: {payload}")
+
+        target_id = payload.get("target_id")
+        if not target_id:
+            raise HTTPException(status_code=400, detail="target_id required")
+
+        target = db.get(Target, target_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="Target not found")
+
+        logger.info(f"[AGENT] target resolved: {target_id}")
+        logger.info(f"[AGENT] execution started")
+
+        result = await run_scan_for_target(target_id)
+
+        return {
+            "status": "success",
+            "mode": "autonomous-agent",
+            "input_event": payload,
+            "target": {
+                "id": target.id,
+                "url": target.url,
+                "label": target.label
+            },
+            "agent_result": result
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"simulate-event failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent/run/{target_id}")
+async def run_agent_direct(target_id: int, db: Session = Depends(get_db)):
+    try:
+        target = db.get(Target, target_id)
+        if not target:
+            raise HTTPException(404, "Target not found")
+
+        logger.info(f"[AGENT] target resolved: {target_id}")
+        logger.info(f"[AGENT] execution started")
+
+        result = await run_scan_for_target(target_id)
+
+        return {
+            "status": "ok",
+            "mode": "direct-agent-run",
+            "target_id": target_id,
+            "result": result
+        }
+
+    except Exception as e:
+        logger.error(f"agent run failed: {str(e)}")
+        raise HTTPException(500, str(e))
